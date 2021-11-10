@@ -10,6 +10,7 @@ python-telegram-bot = "^13.8.1"
 environs = "^9.3.4"
 redis = "^3.5.3"
 thefuzz = {extras = ["python-Levenshtein"], version = "^0.19.0"}
+vk-api = "^11.9.6"
 
 [tool.poetry.dev-dependencies]
 black = {version = "^21.10b0", allow-prereleases = true}

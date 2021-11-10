@@ -78,7 +78,7 @@ def handle_solution_attempt(update, context, redis_db):
     return status
 
 
-def handle_giveup(update, context, redis_db):
+def handle_giveup(update, context, redis_db, quiz_list):
     user_id = update.message.chat_id
     correct_answer = redis_db.get(user_id).decode().split('.')[0]
 
@@ -87,7 +87,7 @@ def handle_giveup(update, context, redis_db):
         reply_markup=ReplyKeyboardMarkup(KEYBOARD),
     )
 
-    return BotStates.QUESTION
+    handle_new_question_request(update, context, redis_db, quiz_list)
 
 
 def handle_random_user_input(update, context):
@@ -140,7 +140,11 @@ def main():
                 BotStates.ANSWER: [
                     MessageHandler(
                         Filters.regex('^(Сдаться)$'),
-                        partial(handle_giveup, redis_db=redis_db),
+                        partial(
+                            handle_giveup,
+                            redis_db=redis_db,
+                            quiz_list=quiz_list,
+                        ),
                     ),
                     MessageHandler(
                         Filters.text,
