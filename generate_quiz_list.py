@@ -5,9 +5,13 @@ import re
 import sys
 
 
-def extract_quiz_list_from_file(filename: str) -> list:
+def extract_quiz_from_file(filename: str) -> list:
     with open(filename, mode='r', encoding='KOI8-R') as file:
-        file_content = file.read().replace('\n\n', '\n').replace('\n', ' ')
+        file_content = (
+            file.read()
+            .replace('\n\n', '\n')
+            .replace('\n', ' ')
+        )
 
     quiz_items = re.findall(
         r'Вопрос \d+: (.+?) Ответ: (.+?) Автор:',
@@ -20,12 +24,11 @@ def extract_quiz_list_from_file(filename: str) -> list:
     ]
 
 
-def extract_full_quiz_list():
+def extract_number_of_quizzes(number: int) -> list:
     quiz_list = []
 
-    for filename in list(glob.glob('quiz_textfiles/*.txt'))[:5]:
-        next_piece_of_quiz_list = extract_quiz_list_from_file(filename)
-        quiz_list.extend(next_piece_of_quiz_list)
+    for filename in list(glob.glob('quiz_textfiles/*.txt'))[:number]:
+        quiz_list.extend(extract_quiz_from_file(filename))
 
     return quiz_list
 
@@ -34,7 +37,7 @@ if __name__ == '__main__':
     default_quiz_textfile_name = 'quiz_textfiles/1vs1200.txt'
 
     parser = argparse.ArgumentParser(
-        description=('Generate quiz list based on given quiz textfile.')
+        description=('Generate quiz based on given quiz textfile.')
     )
     parser.add_argument(
         '-f',
@@ -47,7 +50,7 @@ if __name__ == '__main__':
     textfile_name = args.file
 
     try:
-        quiz = extract_quiz_list_from_file(textfile_name)
+        quiz = extract_quiz_from_file(textfile_name)
     except FileNotFoundError:
         sys.exit(f'Couldn\'t find the file "{textfile_name}"')
     else:
