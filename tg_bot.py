@@ -56,6 +56,13 @@ def handle_new_question_request(update, context, redis_db, quiz_list):
     return BotStates.ANSWER
 
 
+def handle_random_user_input(update, context):
+    update.message.reply_text(
+        'Ожидаем, что нажмешь "Новый вопрос"',
+        reply_markup=ReplyKeyboardMarkup(KEYBOARD),
+    )
+
+
 def handle_solution_attempt(update, context, redis_db):
     user_id = update.message.chat_id
     user_answer = update.message.text
@@ -87,14 +94,7 @@ def handle_giveup(update, context, redis_db, quiz_list):
         reply_markup=ReplyKeyboardMarkup(KEYBOARD),
     )
 
-    handle_new_question_request(update, context, redis_db, quiz_list)
-
-
-def handle_random_user_input(update, context):
-    update.message.reply_text(
-        'Ожидаем, что нажмешь "Новый вопрос"',
-        reply_markup=ReplyKeyboardMarkup(KEYBOARD),
-    )
+    return handle_new_question_request(update, context, redis_db, quiz_list)
 
 
 def cancel(update, context):
