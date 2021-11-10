@@ -1,7 +1,5 @@
-from enum import Enum
 from functools import partial
 import logging
-import random
 
 from environs import Env
 from redis import Redis
@@ -13,13 +11,13 @@ from telegram.ext import (
     MessageHandler,
     Updater,
 )
-from thefuzz import fuzz
 
-from generate_quizzes import extract_quizzes
+from utils import (
+    BotStates,
+    handle_question_logic,
+    handle_solution_analyse_logic,
+)
 
-
-KEYBOARD = [['Новый вопрос', 'Сдаться'], ['Мой счет']]
-MIN_ACCURACY = 90
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -28,73 +26,53 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-class BotStates(Enum):
-    QUESTION = 1
-    ANSWER = 2
-
-
 def start(update, context):
+    keyboard = [['Новый вопрос', 'Сдаться'], ['Мой счет']]
+
     update.message.reply_text(
         'Привет. Я бот для викторин! Начинай, нажав на кнопку "Новый вопрос"',
-        reply_markup=ReplyKeyboardMarkup(KEYBOARD),
+        reply_markup=ReplyKeyboardMarkup(keyboard),
     )
 
     return BotStates.QUESTION
 
 
-def handle_new_question_request(update, context, redis_db, quiz_list):
+def handle_question_request(update, context, redis_db):
     user_id = update.message.chat_id
-    quiz = random.choice(quiz_list)
 
-    redis_db.set(user_id, quiz['answer'])
+    question, bot_state = handle_question_logic(user_id, redis_db)
 
-    update.message.reply_text(
-        quiz['question'],
-        reply_markup=ReplyKeyboardMarkup(KEYBOARD),
-    )
+    update.message.reply_text(question)
 
-    return BotStates.ANSWER
+    return bot_state
 
 
 def handle_random_user_input(update, context):
-    update.message.reply_text(
-        'Ожидаем, что нажмешь "Новый вопрос"',
-        reply_markup=ReplyKeyboardMarkup(KEYBOARD),
-    )
+    update.message.reply_text('Ожидаем, что нажмешь "Новый вопрос"')
 
 
 def handle_solution_attempt(update, context, redis_db):
     user_id = update.message.chat_id
     user_answer = update.message.text
 
-    correct_answer = redis_db.get(user_id).decode().split('.')[0]
-    accuracy = fuzz.token_set_ratio(user_answer, correct_answer)
-
-    if accuracy >= MIN_ACCURACY:
-        response = 'Правильно! Поздравляю!'
-        status = BotStates.QUESTION
-    else:
-        response = 'Неправильно... Попробуешь еще раз?'
-        status = BotStates.ANSWER
-
-    update.message.reply_text(
-        response,
-        reply_markup=ReplyKeyboardMarkup(KEYBOARD),
+    response, bot_state = handle_solution_analyse_logic(
+        user_id,
+        user_answer,
+        redis_db,
     )
 
-    return status
+    update.message.reply_text(response)
+
+    return bot_state
 
 
-def handle_giveup(update, context, redis_db, quiz_list):
+def handle_giveup_request(update, context, redis_db):
     user_id = update.message.chat_id
     correct_answer = redis_db.get(user_id).decode().split('.')[0]
 
-    update.message.reply_text(
-        f'Правильный ответ: {correct_answer}',
-        reply_markup=ReplyKeyboardMarkup(KEYBOARD),
-    )
+    update.message.reply_text(f'Правильный ответ: {correct_answer}')
 
-    return handle_new_question_request(update, context, redis_db, quiz_list)
+    return handle_question_request(update, context, redis_db)
 
 
 def cancel(update, context):
@@ -117,8 +95,6 @@ def main():
         password=redis_password,
     )
 
-    quiz_list = extract_quizzes()
-
     updater = Updater(tg_bot_token, use_context=True)
     dp = updater.dispatcher
 
@@ -129,22 +105,14 @@ def main():
                 BotStates.QUESTION: [
                     MessageHandler(
                         Filters.regex('^(Новый вопрос)$'),
-                        partial(
-                            handle_new_question_request,
-                            redis_db=redis_db,
-                            quiz_list=quiz_list,
-                        ),
+                        partial(handle_question_request, redis_db=redis_db),
                     ),
                     MessageHandler(Filters.text, handle_random_user_input),
                 ],
                 BotStates.ANSWER: [
                     MessageHandler(
                         Filters.regex('^(Сдаться)$'),
-                        partial(
-                            handle_giveup,
-                            redis_db=redis_db,
-                            quiz_list=quiz_list,
-                        ),
+                        partial(handle_giveup_request, redis_db=redis_db),
                     ),
                     MessageHandler(
                         Filters.text,
