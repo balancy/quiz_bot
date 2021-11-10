@@ -7,11 +7,13 @@ from environs import Env
 from redis import Redis
 from telegram import ReplyKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
+from thefuzz import fuzz
 
-from generate_quiz_list import extract_number_of_quizzes
+from generate_quizzes import extract_quizzes
 
 
 KEYBOARD = [['Новый вопрос', 'Сдаться'], ['Мой счет']]
+MIN_ACCURACY = 90
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -27,17 +29,33 @@ def start(update, context):
     )
 
 
-def get_new_question(update, context, redis_db, quiz_list):
-    quiz = random.choice(quiz_list)
+def send_question(update, context, redis_db, quiz_list):
     user_id = update.message.chat_id
+    quiz = random.choice(quiz_list)
 
-    redis_db.set(
-        user_id,
-        quiz['question'],
+    redis_db.set(user_id, json.dumps(quiz, ensure_ascii=False))
+
+    update.message.reply_text(
+        json.loads(redis_db.get(user_id))['question'],
+        reply_markup=ReplyKeyboardMarkup(KEYBOARD),
+    )
+
+
+def check_answer(update, context, redis_db):
+    user_id = update.message.chat_id
+    user_answer = update.message.text
+
+    correct_answer = json.loads(redis_db.get(user_id))['answer'].split('.')[0]
+    accuracy = fuzz.token_set_ratio(user_answer, correct_answer)
+
+    response_to_bot = (
+        'Правильно! Поздравляю!'
+        if accuracy >= MIN_ACCURACY
+        else 'Неправильно... Попробуешь еще раз?'
     )
 
     update.message.reply_text(
-        redis_db.get(user_id).decode(),
+        response_to_bot,
         reply_markup=ReplyKeyboardMarkup(KEYBOARD),
     )
 
@@ -57,7 +75,7 @@ def main():
         password=redis_password,
     )
 
-    quiz_list = extract_number_of_quizzes(number=5)
+    quiz_list = extract_quizzes()
 
     updater = Updater(tg_bot_token, use_context=True)
     dp = updater.dispatcher
@@ -66,8 +84,14 @@ def main():
     dp.add_handler(
         MessageHandler(
             Filters.regex('^(Новый вопрос)$'),
-            partial(get_new_question, redis_db=redis_db, quiz_list=quiz_list),
+            partial(send_question, redis_db=redis_db, quiz_list=quiz_list),
         )
+    )
+    dp.add_handler(
+        MessageHandler(
+            Filters.text & ~Filters.command,
+            partial(check_answer, redis_db=redis_db),
+        ),
     )
 
     updater.start_polling()
