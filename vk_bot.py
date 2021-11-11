@@ -11,8 +11,9 @@ from utils import (
     BotStates,
     From,
     check_solution,
-    get_correct_answer,
+    handle_giveup_logic,
     handle_question_logic,
+    handle_score_logic,
 )
 
 
@@ -86,12 +87,26 @@ def handle_giveup_request(event, api, db):
     """
 
     user_id = event.user_id
-    correct_answer = get_correct_answer(user_id, From.VK, db)
-    message = f'Правильный ответ: {correct_answer}'
+    message = handle_giveup_logic(user_id, From.VK, db)
 
     api.messages.send(peer_id=user_id, message=message, random_id=get_id())
 
     handle_question_request(event, api, db)
+
+
+def handle_score_request(event, api, db):
+    """Handles score request from the user. Sends the score.
+
+    Args:
+        event: bot event
+        api: bot api
+        db: db to store the score
+    """
+
+    user_id = event.user_id
+    message = handle_score_logic(user_id, From.VK, db)
+
+    api.messages.send(peer_id=user_id, message=message, random_id=get_id())
 
 
 if __name__ == "__main__":
@@ -126,5 +141,7 @@ if __name__ == "__main__":
             else:
                 if event.text == 'Сдаться':
                     handle_giveup_request(event, vk_api, db)
+                elif event.text == 'Мой счет':
+                    handle_score_request(event, vk_api, db)
                 else:
                     handle_solution_attempt(event, vk_api, db)

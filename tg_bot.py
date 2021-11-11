@@ -16,8 +16,10 @@ from utils import (
     BotStates,
     From,
     check_solution,
-    get_correct_answer,
+    handle_giveup_logic,
     handle_question_logic,
+    handle_score_flush,
+    handle_score_logic,
 )
 
 
@@ -28,7 +30,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def start(update, context):
+def start(update, context, db):
     """Handles start command from the user.
 
     Args:
@@ -39,11 +41,14 @@ def start(update, context):
     """
 
     keyboard = [['Новый вопрос', 'Сдаться'], ['Мой счет']]
+    user_id = update.message.chat_id
 
     update.message.reply_text(
         'Я бот для викторин! Начинай, нажав на кнопку "Новый вопрос"',
         reply_markup=ReplyKeyboardMarkup(keyboard),
     )
+
+    handle_score_flush(user_id, From.TG, db)
 
     return BotStates.QUESTION
 
@@ -103,11 +108,24 @@ def handle_giveup_request(update, context, db):
     """
 
     user_id = update.message.chat_id
-    correct_answer = get_correct_answer(user_id, From.TG, db)
+    message = handle_giveup_logic(user_id, From.TG, db)
 
-    update.message.reply_text(f'Правильный ответ: {correct_answer}')
+    update.message.reply_text(message)
 
     handle_question_request(update, context, db)
+
+
+def handle_score_request(update, context, db):
+    """Handles score request from the user. Sends the score.
+
+    Args:
+        update, context: internal arguments of the bot
+    """
+
+    user_id = update.message.chat_id
+    message = handle_score_logic(user_id, From.TG, db)
+
+    update.message.reply_text(message)
 
 
 def cancel(update, context):
@@ -135,7 +153,7 @@ def main():
 
     dp.add_handler(
         ConversationHandler(
-            entry_points=[CommandHandler('start', start)],
+            entry_points=[CommandHandler('start', partial(start, db=db))],
             states={
                 BotStates.QUESTION: [
                     MessageHandler(
@@ -148,6 +166,10 @@ def main():
                     MessageHandler(
                         Filters.regex('^(Сдаться)$'),
                         partial(handle_giveup_request, db=db),
+                    ),
+                    MessageHandler(
+                        Filters.regex('^(Мой счет)$'),
+                        partial(handle_score_request, db=db),
                     ),
                     MessageHandler(
                         Filters.text,
