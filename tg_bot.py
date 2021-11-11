@@ -14,6 +14,7 @@ from telegram.ext import (
 
 from utils import (
     BotStates,
+    From,
     check_solution,
     get_correct_answer,
     handle_question_logic,
@@ -57,7 +58,9 @@ def handle_question_request(update, context, db):
         state of the bot
     """
 
-    question = handle_question_logic(update.message.chat_id, db)
+    user_id = update.message.chat_id
+
+    question = handle_question_logic(user_id, From.TG, db)
 
     update.message.reply_text(question)
 
@@ -84,7 +87,7 @@ def handle_solution_attempt(update, context, db):
     user_id = update.message.chat_id
     user_answer = update.message.text
 
-    is_correct, message = check_solution(user_id, user_answer, db)
+    is_correct, message = check_solution(user_id, From.TG, user_answer, db)
 
     update.message.reply_text(message)
 
@@ -99,7 +102,8 @@ def handle_giveup_request(update, context, db):
         update, context: internal arguments of the bot
     """
 
-    correct_answer = get_correct_answer(update.message.chat_id, db)
+    user_id = update.message.chat_id
+    correct_answer = get_correct_answer(user_id, From.TG, db)
 
     update.message.reply_text(f'Правильный ответ: {correct_answer}')
 

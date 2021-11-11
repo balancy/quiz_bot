@@ -9,6 +9,7 @@ from vk_api.utils import get_random_id as get_id
 
 from utils import (
     BotStates,
+    From,
     check_solution,
     get_correct_answer,
     handle_question_logic,
@@ -22,31 +23,32 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def handle_question_request(event, vk_api, db):
+def handle_question_request(event, api, db):
     """Handles question request from the user. Sends a new question.
 
     Args:
         event: bot event
-        vk_api: bot api
+        api: bot api
         db: db to store correct answer
     """
 
     user_id = event.user_id
-    question = handle_question_logic(user_id, db)
 
-    vk_api.messages.send(peer_id=user_id, message=question, random_id=get_id())
+    question = handle_question_logic(user_id, From.VK, db)
+
+    api.messages.send(peer_id=user_id, message=question, random_id=get_id())
 
 
-def handle_random_user_input(event, vk_api, keyboard):
+def handle_random_user_input(event, api, keyboard):
     """Handles random user input. Sends a message how to start the quiz.
 
     Args:
         event: bot event
-        vk_api: bot api
+        api: bot api
         keyboard: keyboard to display to the user
     """
 
-    vk_api.messages.send(
+    api.messages.send(
         peer_id=event.user_id,
         message='Для старта викторины нажимай "Новый вопрос"',
         keyboard=keyboard.get_keyboard(),
@@ -54,42 +56,42 @@ def handle_random_user_input(event, vk_api, keyboard):
     )
 
 
-def handle_solution_attempt(event, vk_api, db):
+def handle_solution_attempt(event, api, db):
     """Handles solution attempt from the user. Responds accordingly.
 
     Args:
         event: bot event
-        vk_api: bot api
+        api: bot api
         db: db to store correct answer
     """
 
     user_id = event.user_id
     user_answer = event.text
 
-    is_correct, message = check_solution(user_id, user_answer, db)
+    is_correct, message = check_solution(user_id, From.VK, user_answer, db)
 
-    vk_api.messages.send(peer_id=user_id, message=message, random_id=get_id())
+    api.messages.send(peer_id=user_id, message=message, random_id=get_id())
 
     if is_correct:
-        handle_question_request(event, vk_api, db)
+        handle_question_request(event, api, db)
 
 
-def handle_giveup_request(event, vk_api, db):
+def handle_giveup_request(event, api, db):
     """Handles a giveup request from the user. Sends the correct answer.
 
     Args:
         event: bot event
-        vk_api: bot api
+        api: bot api
         db: db to store correct answer
     """
 
     user_id = event.user_id
-    correct_answer = get_correct_answer(user_id, db)
+    correct_answer = get_correct_answer(user_id, From.VK, db)
     message = f'Правильный ответ: {correct_answer}'
 
-    vk_api.messages.send(peer_id=user_id, message=message, random_id=get_id())
+    api.messages.send(peer_id=user_id, message=message, random_id=get_id())
 
-    handle_question_request(event, vk_api, db)
+    handle_question_request(event, api, db)
 
 
 if __name__ == "__main__":
