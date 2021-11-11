@@ -1,5 +1,5 @@
 .env
 .venv
-quiz_textfiles
+quiz_textfiles/[a-z]*.txt
 __pycache__
 quiz.json
