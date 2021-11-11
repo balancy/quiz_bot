@@ -23,6 +23,14 @@ logger = logging.getLogger(__name__)
 
 
 def handle_question_request(event, vk_api, db):
+    """Handles question request from the user. Sends a new question.
+
+    Args:
+        event: bot event
+        vk_api: bot api
+        db: db to store correct answer
+    """
+
     user_id = event.user_id
     question = handle_question_logic(user_id, db)
 
@@ -30,6 +38,14 @@ def handle_question_request(event, vk_api, db):
 
 
 def handle_random_user_input(event, vk_api, keyboard):
+    """Handles random user input. Sends a message how to start the quiz.
+
+    Args:
+        event: bot event
+        vk_api: bot api
+        keyboard: keyboard to display to the user
+    """
+
     vk_api.messages.send(
         peer_id=event.user_id,
         message='Для старта викторины нажимай "Новый вопрос"',
@@ -39,6 +55,14 @@ def handle_random_user_input(event, vk_api, keyboard):
 
 
 def handle_solution_attempt(event, vk_api, db):
+    """Handles solution attempt from the user. Responds accordingly.
+
+    Args:
+        event: bot event
+        vk_api: bot api
+        db: db to store correct answer
+    """
+
     user_id = event.user_id
     user_answer = event.text
 
@@ -51,6 +75,14 @@ def handle_solution_attempt(event, vk_api, db):
 
 
 def handle_giveup_request(event, vk_api, db):
+    """Handles a giveup request from the user. Sends the correct answer.
+
+    Args:
+        event: bot event
+        vk_api: bot api
+        db: db to store correct answer
+    """
+
     user_id = event.user_id
     correct_answer = get_correct_answer(user_id, db)
     message = f'Правильный ответ: {correct_answer}'

@@ -16,6 +16,17 @@ class BotStates(Enum):
 
 
 def handle_question_logic(user_id, db):
+    """Handles question logic. Generates random question-answer, writes the
+    answer to the db and returns the question.
+
+    Args:
+        user_id: user id
+        db: database to store the answer
+
+    Returns:
+        quiz question
+    """
+
     quiz = random.choice(QUIZ_LIST)
 
     db.set(user_id, quiz['answer'])
@@ -24,6 +35,19 @@ def handle_question_logic(user_id, db):
 
 
 def check_solution(user_id, user_answer, db):
+    """Handles solution check logic. Checks the accuracy of user answer.
+    answer to the db and returns the question.
+
+    Args:
+        user_id: user id
+        user_answer: user answer
+        db: database to store the answer
+
+    Returns:
+        is user answer correct
+        response to the bot
+    """
+
     correct_answer_with_comments = db.get(user_id).decode()
     correct_answer = correct_answer_with_comments.split('.')[0]
 
@@ -38,4 +62,14 @@ def check_solution(user_id, user_answer, db):
 
 
 def get_correct_answer(user_id, db):
+    """Gets the correct answer from the db
+
+    Args:
+        user_id: user id
+        db: database to store the answer
+
+    Returns:
+        correct answer
+    """
+
     return db.get(user_id).decode().split('.')[0]

@@ -6,6 +6,15 @@ import re
 
 
 def extract_quiz_from_file(filename: str) -> list:
+    """Generates a list of pairs question-answser from a text file
+
+    Args:
+        filename (str): filename of text file to generate quiz from
+
+    Returns:
+        list of pairs question-answer
+    """
+
     with open(filename, mode='r', encoding='KOI8-R') as file:
         content = file.read().replace('\n\n', '\n').replace('\n', ' ')
 
@@ -18,15 +27,24 @@ def extract_quiz_from_file(filename: str) -> list:
 
 
 def extract_quizzes(number: int = 5) -> list:
-    quiz_list = []
+    """Extract a certain number of quizzes from random files
+
+    Args:
+        number (int, optional): number of files to extract quizzes from
+
+    Returns:
+        quizzes_list: list of quizzes generated from files
+    """
+
+    quizzes_list = []
 
     list_of_quiz_files = glob.glob('quiz_textfiles/*.txt')
     random.shuffle(list_of_quiz_files)
 
     for filename in list_of_quiz_files[:number]:
-        quiz_list.extend(extract_quiz_from_file(filename))
+        quizzes_list.extend(extract_quiz_from_file(filename))
 
-    return quiz_list
+    return quizzes_list
 
 
 if __name__ == '__main__':

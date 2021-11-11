@@ -28,6 +28,15 @@ logger = logging.getLogger(__name__)
 
 
 def start(update, context):
+    """Handles start command from the user.
+
+    Args:
+        update, context: internal arguments of the bot
+
+    Returns:
+        state of the bot
+    """
+
     keyboard = [['Новый вопрос', 'Сдаться'], ['Мой счет']]
 
     update.message.reply_text(
@@ -39,6 +48,15 @@ def start(update, context):
 
 
 def handle_question_request(update, context, db):
+    """Handles question request from the bot. Sends a new question.
+
+    Args:
+        update, context: internal arguments of the bot
+
+    Returns:
+        state of the bot
+    """
+
     question = handle_question_logic(update.message.chat_id, db)
 
     update.message.reply_text(question)
@@ -47,10 +65,22 @@ def handle_question_request(update, context, db):
 
 
 def handle_random_user_input(update, context):
+    """Handles random user input. Sends a message how to start the quiz.
+
+    Args:
+        update, context: internal arguments of the bot
+    """
+
     update.message.reply_text('Для старта викторины нажимай "Новый вопрос"')
 
 
 def handle_solution_attempt(update, context, db):
+    """Handles solution attempt from the user. Responds accordingly.
+
+    Args:
+        update, context: internal arguments of the bot
+    """
+
     user_id = update.message.chat_id
     user_answer = update.message.text
 
@@ -63,6 +93,12 @@ def handle_solution_attempt(update, context, db):
 
 
 def handle_giveup_request(update, context, db):
+    """Handles a giveup request from the user. Sends the correct answer.
+
+    Args:
+        update, context: internal arguments of the bot
+    """
+
     correct_answer = get_correct_answer(update.message.chat_id, db)
 
     update.message.reply_text(f'Правильный ответ: {correct_answer}')
