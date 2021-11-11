@@ -15,24 +15,27 @@ class BotStates(Enum):
     ANSWER = 2
 
 
-def handle_question_logic(user_id, redis_db):
+def handle_question_logic(user_id, db):
     quiz = random.choice(QUIZ_LIST)
 
-    redis_db.set(user_id, quiz['answer'])
+    db.set(user_id, quiz['answer'])
 
-    return quiz['question'], BotStates.ANSWER
+    return quiz['question']
 
 
-def handle_solution_analyse_logic(user_id, user_answer, redis_db):
-    correct_answer_with_comments = redis_db.get(user_id).decode()
+def check_solution(user_id, user_answer, db):
+    correct_answer_with_comments = db.get(user_id).decode()
     correct_answer = correct_answer_with_comments.split('.')[0]
+
     accuracy = fuzz.token_set_ratio(user_answer, correct_answer)
 
-    if accuracy >= MIN_ACCURACY:
+    if is_correct := True if accuracy >= MIN_ACCURACY else False:
         response = 'Правильно! Поздравляю!'
-        bot_state = BotStates.QUESTION
     else:
         response = 'Неправильно... Попробуешь еще раз?'
-        bot_state = BotStates.ANSWER
 
-    return response, bot_state
+    return is_correct, response
+
+
+def get_correct_answer(user_id, db):
+    return db.get(user_id).decode().split('.')[0]

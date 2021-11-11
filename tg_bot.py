@@ -14,8 +14,9 @@ from telegram.ext import (
 
 from utils import (
     BotStates,
+    check_solution,
+    get_correct_answer,
     handle_question_logic,
-    handle_solution_analyse_logic,
 )
 
 
@@ -30,49 +31,43 @@ def start(update, context):
     keyboard = [['Новый вопрос', 'Сдаться'], ['Мой счет']]
 
     update.message.reply_text(
-        'Привет. Я бот для викторин! Начинай, нажав на кнопку "Новый вопрос"',
+        'Я бот для викторин! Начинай, нажав на кнопку "Новый вопрос"',
         reply_markup=ReplyKeyboardMarkup(keyboard),
     )
 
     return BotStates.QUESTION
 
 
-def handle_question_request(update, context, redis_db):
-    user_id = update.message.chat_id
-
-    question, bot_state = handle_question_logic(user_id, redis_db)
+def handle_question_request(update, context, db):
+    question = handle_question_logic(update.message.chat_id, db)
 
     update.message.reply_text(question)
 
-    return bot_state
+    return BotStates.ANSWER
 
 
 def handle_random_user_input(update, context):
-    update.message.reply_text('Ожидаем, что нажмешь "Новый вопрос"')
+    update.message.reply_text('Для старта викторины нажимай "Новый вопрос"')
 
 
-def handle_solution_attempt(update, context, redis_db):
+def handle_solution_attempt(update, context, db):
     user_id = update.message.chat_id
     user_answer = update.message.text
 
-    response, bot_state = handle_solution_analyse_logic(
-        user_id,
-        user_answer,
-        redis_db,
-    )
+    is_correct, message = check_solution(user_id, user_answer, db)
 
-    update.message.reply_text(response)
+    update.message.reply_text(message)
 
-    return bot_state
+    if is_correct:
+        handle_question_request(update, context, db)
 
 
-def handle_giveup_request(update, context, redis_db):
-    user_id = update.message.chat_id
-    correct_answer = redis_db.get(user_id).decode().split('.')[0]
+def handle_giveup_request(update, context, db):
+    correct_answer = get_correct_answer(update.message.chat_id, db)
 
     update.message.reply_text(f'Правильный ответ: {correct_answer}')
 
-    return handle_question_request(update, context, redis_db)
+    handle_question_request(update, context, db)
 
 
 def cancel(update, context):
@@ -89,7 +84,7 @@ def main():
     redis_port = env.str('REDIS_PORT')
     redis_password = env.str('REDIS_PASSWORD')
 
-    redis_db = Redis(
+    db = Redis(
         host=redis_endpoint,
         port=redis_port,
         password=redis_password,
@@ -105,18 +100,18 @@ def main():
                 BotStates.QUESTION: [
                     MessageHandler(
                         Filters.regex('^(Новый вопрос)$'),
-                        partial(handle_question_request, redis_db=redis_db),
+                        partial(handle_question_request, db=db),
                     ),
                     MessageHandler(Filters.text, handle_random_user_input),
                 ],
                 BotStates.ANSWER: [
                     MessageHandler(
                         Filters.regex('^(Сдаться)$'),
-                        partial(handle_giveup_request, redis_db=redis_db),
+                        partial(handle_giveup_request, db=db),
                     ),
                     MessageHandler(
                         Filters.text,
-                        partial(handle_solution_attempt, redis_db=redis_db),
+                        partial(handle_solution_attempt, db=db),
                     ),
                 ],
             },
