@@ -37,6 +37,13 @@ pip install -r requirements.txt
 - `REDIS_PORT` - port of your redis db
 - `REDIS_PASSWORDT` - password of your redis db
 
+## Populate DB
+
+```code
+python quizzes_handling.py --number <number>
+```
+where `number` is number of quizzes to populate the DB. By default it's 5.
+
 ## Launch bots
 
 1. Run telegram bot
