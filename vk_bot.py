@@ -1,4 +1,6 @@
+import json
 import logging
+from random import randint
 
 from environs import Env
 from redis import Redis
@@ -7,17 +9,27 @@ from vk_api.keyboard import VkKeyboard
 from vk_api.longpoll import VkLongPoll, VkEventType
 from vk_api.utils import get_random_id as get_id
 
-from utils import (
-    BotStates,
-    From,
-    check_solution,
-    handle_giveup_logic,
-    handle_question_logic,
-    handle_score_logic,
-)
+from solution_checking import check_solution
 
 
 logger = logging.getLogger(__name__)
+
+
+def start(event, api, keyboard):
+    """Handles conversation start with the user.
+
+    Args:
+        event: bot event
+        api: bot api
+        keyboard: keyboard to display to the user
+    """
+
+    api.messages.send(
+        peer_id=event.user_id,
+        message='Приступим',
+        random_id=get_id(),
+        keyboard=keyboard.get_keyboard(),
+    )
 
 
 def handle_question_request(event, api, db):
@@ -31,24 +43,17 @@ def handle_question_request(event, api, db):
 
     user_id = event.user_id
 
-    question = handle_question_logic(user_id, From.VK, db)
+    number_of_questions = int(db.get('number_of_questions'))
 
-    api.messages.send(peer_id=user_id, message=question, random_id=get_id())
+    random_question = json.loads(
+        db.get(f'question_{randint(1, number_of_questions)}'),
+    )
 
-
-def handle_random_user_input(event, api, keyboard):
-    """Handles random user input. Sends a message how to start the quiz.
-
-    Args:
-        event: bot event
-        api: bot api
-        keyboard: keyboard to display to the user
-    """
+    db.set(f'user_VK_{user_id}', random_question['answer'])
 
     api.messages.send(
-        peer_id=event.user_id,
-        message='Для старта викторины нажимай "Новый вопрос"',
-        keyboard=keyboard.get_keyboard(),
+        peer_id=user_id,
+        message=f'Вопрос: {random_question["question"]}',
         random_id=get_id(),
     )
 
@@ -65,7 +70,7 @@ def handle_solution_attempt(event, api, db):
     user_id = event.user_id
     user_answer = event.text
 
-    is_correct, message = check_solution(user_id, From.VK, user_answer, db)
+    is_correct, message = check_solution(user_id, 'VK', user_answer, db)
 
     api.messages.send(peer_id=user_id, message=message, random_id=get_id())
 
@@ -83,9 +88,11 @@ def handle_giveup_request(event, api, db):
     """
 
     user_id = event.user_id
-    message = handle_giveup_logic(user_id, From.VK, db)
 
-    api.messages.send(peer_id=user_id, message=message, random_id=get_id())
+    answer = f'Правильный ответ: {db.get(f"user_VK_{user_id}").decode()}'
+    db.incr(f'user_VK_{user_id}_given_up')
+
+    api.messages.send(peer_id=user_id, message=answer, random_id=get_id())
 
     handle_question_request(event, api, db)
 
@@ -100,7 +107,13 @@ def handle_score_request(event, api, db):
     """
 
     user_id = event.user_id
-    message = handle_score_logic(user_id, From.VK, db)
+    template = f'user_VK_{user_id}_'
+
+    message = (
+        f'Угадал раз: {int(db.get(f"{template}succeded") or 0)}\n'
+        f'Неудачных попыток: {int(db.get(f"{template}failed") or 0)}\n'
+        f'Сдался раз: {int(db.get(f"{template}given_up") or 0)}\n'
+    )
 
     api.messages.send(peer_id=user_id, message=message, random_id=get_id())
 
@@ -120,7 +133,6 @@ if __name__ == "__main__":
     redis_password = env.str('REDIS_PASSWORD')
 
     db = Redis(host=redis_endpoint, port=redis_port, password=redis_password)
-    bot_state = BotStates.QUESTION
 
     vk_session = vk.VkApi(token=vk_bot_token)
     vk_api = vk_session.get_api()
@@ -131,16 +143,18 @@ if __name__ == "__main__":
     keyboard.add_line()
     keyboard.add_button('Мой счет')
 
+    bot_started = False
+
     for event in VkLongPoll(vk_session).listen():
         if event.type == VkEventType.MESSAGE_NEW and event.to_me:
-            if bot_state == BotStates.QUESTION:
+            if not bot_started:
+                start(event, vk_api, keyboard)
+                handle_question_request(event, vk_api, db)
+                bot_started = True
+            else:
                 if event.text == 'Новый вопрос':
                     handle_question_request(event, vk_api, db)
-                    bot_state = BotStates.ANSWER
-                else:
-                    handle_random_user_input(event, vk_api, keyboard)
-            else:
-                if event.text == 'Сдаться':
+                elif event.text == 'Сдаться':
                     handle_giveup_request(event, vk_api, db)
                 elif event.text == 'Мой счет':
                     handle_score_request(event, vk_api, db)

@@ -14,7 +14,7 @@ from telegram.ext import (
     Updater,
 )
 
-from utils import check_solution
+from solution_checking import check_solution
 
 
 IDLE_STATE = 0
@@ -92,10 +92,10 @@ def handle_giveup_request(update, context, db):
 
     user_id = update.message.chat_id
 
-    answer = db.get(f'user_TG_{user_id}').decode()
+    answer = f'Правильный ответ: {db.get(f"user_TG_{user_id}").decode()}'
     db.incr(f'user_TG_{user_id}_given_up')
 
-    update.message.reply_text(f'Правильный ответ: {answer}')
+    update.message.reply_text(answer)
 
     handle_question_request(update, context, db)
 
@@ -107,9 +107,7 @@ def handle_score_request(update, context, db):
         update, context: internal arguments of the bot
     """
 
-    user_id = update.message.chat_id
-
-    template = f'user_TG_{user_id}_'
+    template = f'user_TG_{update.message.chat_id}_'
 
     message = (
         f'Угадал раз: {int(db.get(f"{template}succeded") or 0)}\n'
