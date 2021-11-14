@@ -3,7 +3,8 @@
 ![telegram bot image](https://i.ibb.co/hB1CwSS/image.png)
 
 Telegram and Vkontakte quiz bots in Russian. Quiz is generated randomly from a
-large number of text files representing played quiz games in the past.
+large number of text files representing played quiz games in the past and is
+written then in Redis db.
 
 Link to telegram bot: [Bot](https://t.me/balancy_quiz_bot)
 
@@ -37,12 +38,22 @@ pip install -r requirements.txt
 - `REDIS_PORT` - port of your redis db
 - `REDIS_PASSWORDT` - password of your redis db
 
-## Populate DB
+## Flush DB
+
+In case you need to flush the database, use
 
 ```code
-python quizzes_handling.py --number <number>
+python flush_db.py
 ```
-where `number` is number of quizzes to populate the DB. By default it's 5.
+
+## Populate DB
+
+To populate the database, use
+
+```code
+python populate_db.py --number <number>
+```
+where `number` is number of quizzes to populate the DB. By default it's 10.
 
 ## Launch bots
 
