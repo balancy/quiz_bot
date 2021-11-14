@@ -35,13 +35,13 @@ if __name__ == '__main__':
 
     quizzes = extract_quizzes(number)
 
-    new_dict = dict()
+    packed_quizzes = dict()
     for index, (question, answer) in enumerate(quizzes.items(), 1):
-        new_dict[f'question_{index}'] = json.dumps(
+        packed_quizzes[f'question_{index}'] = json.dumps(
             {'question': question, 'answer': answer}, ensure_ascii=False
         )
 
-    new_dict['total_questions'] = len(quizzes)
+    packed_quizzes['number_of_questions'] = len(quizzes)
 
-    db.mset(quizzes)
+    db.mset(packed_quizzes)
     print(f'Number of DB records is {len(db.keys())}')

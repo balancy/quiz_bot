@@ -58,8 +58,8 @@ def get_correct_answer(user_id, messenger, db):
         correct answer
     """
 
-    correct_answer_with_comment = db.get(f'user_{messenger}_{user_id}')
-    correct_answer = correct_answer_with_comment.decode().split('.')[0]
+    correct_answer = db.get(f'user_{messenger}_{user_id}').decode()
+    # correct_answer = correct_answer_with_comment.decode().split('.')[0]
 
     return correct_answer
 
@@ -79,16 +79,16 @@ def check_solution(user_id, messenger, user_answer, db):
         response: response to the bot
     """
 
-    correct_answer = get_correct_answer(user_id, messenger, db)
+    correct_answer = db.get(f'user_{messenger}_{user_id}').decode()
 
     accuracy = fuzz.token_set_ratio(user_answer, correct_answer)
 
     if is_correct := True if accuracy >= MIN_ACCURACY else False:
         response = 'Правильно! Поздравляю!'
-        db.incr(f'user_{messenger}_{user_id}_{ScoreKeys.SUCCEDED}')
+        db.incr(f'user_{messenger}_{user_id}_succeded')
     else:
         response = 'Неправильно... Попробуешь еще раз?'
-        db.incr(f'user_{messenger}_{user_id}_{ScoreKeys.FAILED}')
+        db.incr(f'user_{messenger}_{user_id}_failed')
 
     return is_correct, response
 
@@ -120,10 +120,8 @@ def handle_score_flush(user_id, messenger, db):
         db: database to store the score
     """
 
-    template = f'user_{messenger}_{user_id}_'
-
     for key in ScoreKeys:
-        db.set(f'{template}{key}', 0)
+        db.set(f'user_{messenger}_{user_id}_{key}', 0)
 
 
 def handle_score_logic(user_id, messenger, db):

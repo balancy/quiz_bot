@@ -1,5 +1,7 @@
 from functools import partial
+import json
 import logging
+from random import randint
 
 from environs import Env
 from redis import Redis
@@ -12,21 +14,12 @@ from telegram.ext import (
     Updater,
 )
 
-from utils import (
-    BotStates,
-    From,
-    check_solution,
-    handle_giveup_logic,
-    handle_question_logic,
-    handle_score_flush,
-    handle_score_logic,
-)
+from utils import check_solution
 
 
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO,
-)
+IDLE_STATE = 0
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -40,17 +33,13 @@ def start(update, context, db):
         state of the bot
     """
 
-    keyboard = [['Новый вопрос', 'Сдаться'], ['Мой счет']]
-    user_id = update.message.chat_id
+    keyboard = ReplyKeyboardMarkup([['Новый вопрос', 'Сдаться'], ['Мой счет']])
 
-    update.message.reply_text(
-        'Я бот для викторин! Начинай, нажав на кнопку "Новый вопрос"',
-        reply_markup=ReplyKeyboardMarkup(keyboard),
-    )
+    update.message.reply_text('Приступим', reply_markup=keyboard)
 
-    handle_score_flush(user_id, From.TG, db)
+    handle_question_request(update, context, db)
 
-    return BotStates.QUESTION
+    return IDLE_STATE
 
 
 def handle_question_request(update, context, db):
@@ -65,21 +54,15 @@ def handle_question_request(update, context, db):
 
     user_id = update.message.chat_id
 
-    question = handle_question_logic(user_id, From.TG, db)
+    number_of_questions = int(db.get('number_of_questions'))
 
-    update.message.reply_text(question)
+    random_question = json.loads(
+        db.get(f'question_{randint(1, number_of_questions)}'),
+    )
 
-    return BotStates.ANSWER
+    db.set(f'user_TG_{user_id}', random_question['answer'])
 
-
-def handle_random_user_input(update, context):
-    """Handles random user input. Sends a message how to start the quiz.
-
-    Args:
-        update, context: internal arguments of the bot
-    """
-
-    update.message.reply_text('Для старта викторины нажимай "Новый вопрос"')
+    update.message.reply_text(f'Вопрос: {random_question["question"]}')
 
 
 def handle_solution_attempt(update, context, db):
@@ -92,7 +75,7 @@ def handle_solution_attempt(update, context, db):
     user_id = update.message.chat_id
     user_answer = update.message.text
 
-    is_correct, message = check_solution(user_id, From.TG, user_answer, db)
+    is_correct, message = check_solution(user_id, 'TG', user_answer, db)
 
     update.message.reply_text(message)
 
@@ -108,9 +91,11 @@ def handle_giveup_request(update, context, db):
     """
 
     user_id = update.message.chat_id
-    message = handle_giveup_logic(user_id, From.TG, db)
 
-    update.message.reply_text(message)
+    answer = db.get(f'user_TG_{user_id}').decode()
+    db.incr(f'user_TG_{user_id}_given_up')
+
+    update.message.reply_text(f'Правильный ответ: {answer}')
 
     handle_question_request(update, context, db)
 
@@ -123,7 +108,14 @@ def handle_score_request(update, context, db):
     """
 
     user_id = update.message.chat_id
-    message = handle_score_logic(user_id, From.TG, db)
+
+    template = f'user_TG_{user_id}_'
+
+    message = (
+        f'Угадал раз: {int(db.get(f"{template}succeded") or 0)}\n'
+        f'Неудачных попыток: {int(db.get(f"{template}failed") or 0)}\n'
+        f'Сдался раз: {int(db.get(f"{template}given_up") or 0)}\n'
+    )
 
     update.message.reply_text(message)
 
@@ -134,6 +126,11 @@ def cancel(update, context):
 
 
 def main():
+    logging.basicConfig(
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        level=logging.INFO,
+    )
+
     env = Env()
     env.read_env()
 
@@ -155,14 +152,11 @@ def main():
         ConversationHandler(
             entry_points=[CommandHandler('start', partial(start, db=db))],
             states={
-                BotStates.QUESTION: [
+                IDLE_STATE: [
                     MessageHandler(
                         Filters.regex('^(Новый вопрос)$'),
                         partial(handle_question_request, db=db),
                     ),
-                    MessageHandler(Filters.text, handle_random_user_input),
-                ],
-                BotStates.ANSWER: [
                     MessageHandler(
                         Filters.regex('^(Сдаться)$'),
                         partial(handle_giveup_request, db=db),

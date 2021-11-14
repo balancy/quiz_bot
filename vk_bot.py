@@ -17,10 +17,6 @@ from utils import (
 )
 
 
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO,
-)
 logger = logging.getLogger(__name__)
 
 
@@ -110,6 +106,11 @@ def handle_score_request(event, api, db):
 
 
 if __name__ == "__main__":
+    logging.basicConfig(
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        level=logging.INFO,
+    )
+
     env = Env()
     env.read_env()
 
