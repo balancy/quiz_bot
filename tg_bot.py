@@ -14,7 +14,7 @@ from telegram.ext import (
     Updater,
 )
 
-from solution_checking import check_solution
+from string_functions import check_strings_similarity
 
 
 IDLE_STATE = 0
@@ -72,15 +72,19 @@ def handle_solution_attempt(update, context, db):
         update, context: internal arguments of the bot
     """
 
-    user_id = update.message.chat_id
     user_answer = update.message.text
+    db_key_template = f'user_TG_{update.message.chat_id}'
 
-    is_correct, message = check_solution(user_id, 'TG', user_answer, db)
+    correct_answer = db.get(db_key_template).decode()
+    is_answer_correct = check_strings_similarity(user_answer, correct_answer)
 
-    update.message.reply_text(message)
-
-    if is_correct:
+    if is_answer_correct:
+        db.incr(f'{db_key_template}_succeded')
+        update.message.reply_text("Правильно! Поздравляю!")
         handle_question_request(update, context, db)
+    else:
+        db.incr(f'{db_key_template}_failed')
+        update.message.reply_text("Неправильно... Попробуешь еще раз?")
 
 
 def handle_giveup_request(update, context, db):
