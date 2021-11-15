@@ -9,13 +9,13 @@ from vk_api.keyboard import VkKeyboard
 from vk_api.longpoll import VkLongPoll, VkEventType
 from vk_api.utils import get_random_id as get_id
 
-from solution_checking import check_solution
+from string_functions import check_strings_similarity
 
 
 logger = logging.getLogger(__name__)
 
 
-def start(event, api, keyboard):
+def start(event, api):
     """Handles conversation start with the user.
 
     Args:
@@ -24,12 +24,20 @@ def start(event, api, keyboard):
         keyboard: keyboard to display to the user
     """
 
+    keyboard = VkKeyboard(one_time=False)
+    keyboard.add_button('Новый вопрос')
+    keyboard.add_button('Сдаться')
+    keyboard.add_line()
+    keyboard.add_button('Мой счет')
+
     api.messages.send(
         peer_id=event.user_id,
         message='Приступим',
         random_id=get_id(),
         keyboard=keyboard.get_keyboard(),
     )
+
+    handle_question_request(event, api, db)
 
 
 def handle_question_request(event, api, db):
@@ -69,13 +77,29 @@ def handle_solution_attempt(event, api, db):
 
     user_id = event.user_id
     user_answer = event.text
+    db_key_template = f'user_VK_{user_id}'
 
-    is_correct, message = check_solution(user_id, 'VK', user_answer, db)
+    if (db_value := db.get(db_key_template)) is None:
+        start(event, api, db)
 
-    api.messages.send(peer_id=user_id, message=message, random_id=get_id())
+    correct_answer = db_value.decode()
+    is_answer_correct = check_strings_similarity(user_answer, correct_answer)
 
-    if is_correct:
+    if is_answer_correct:
+        db.incr(f'{db_key_template}_succeded')
+        api.messages.send(
+            peer_id=user_id,
+            message='Правильно! Поздравляю!',
+            random_id=get_id(),
+        )
         handle_question_request(event, api, db)
+    else:
+        db.incr(f'{db_key_template}_failed')
+        api.messages.send(
+            peer_id=user_id,
+            message='Неправильно... Попробуешь еще раз?',
+            random_id=get_id(),
+        )
 
 
 def handle_giveup_request(event, api, db):
@@ -137,26 +161,13 @@ if __name__ == "__main__":
     vk_session = vk.VkApi(token=vk_bot_token)
     vk_api = vk_session.get_api()
 
-    keyboard = VkKeyboard(one_time=False)
-    keyboard.add_button('Новый вопрос')
-    keyboard.add_button('Сдаться')
-    keyboard.add_line()
-    keyboard.add_button('Мой счет')
-
-    bot_started = False
-
     for event in VkLongPoll(vk_session).listen():
         if event.type == VkEventType.MESSAGE_NEW and event.to_me:
-            if not bot_started:
-                start(event, vk_api, keyboard)
+            if event.text == 'Новый вопрос':
                 handle_question_request(event, vk_api, db)
-                bot_started = True
+            elif event.text == 'Сдаться':
+                handle_giveup_request(event, vk_api, db)
+            elif event.text == 'Мой счет':
+                handle_score_request(event, vk_api, db)
             else:
-                if event.text == 'Новый вопрос':
-                    handle_question_request(event, vk_api, db)
-                elif event.text == 'Сдаться':
-                    handle_giveup_request(event, vk_api, db)
-                elif event.text == 'Мой счет':
-                    handle_score_request(event, vk_api, db)
-                else:
-                    handle_solution_attempt(event, vk_api, db)
+                handle_solution_attempt(event, vk_api, db)
