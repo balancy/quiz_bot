@@ -79,10 +79,7 @@ def handle_solution_attempt(event, api, db):
     user_answer = event.text
     db_key_template = f'user_VK_{user_id}'
 
-    if (db_value := db.get(db_key_template)) is None:
-        start(event, api, db)
-
-    correct_answer = db_value.decode()
+    correct_answer = db.get(db_key_template).decode()
     is_answer_correct = check_strings_similarity(user_answer, correct_answer)
 
     if is_answer_correct:
@@ -163,6 +160,8 @@ if __name__ == "__main__":
 
     for event in VkLongPoll(vk_session).listen():
         if event.type == VkEventType.MESSAGE_NEW and event.to_me:
+            if not db.get(f'user_VK_{event.user_id}'):
+                start(event, vk_api, db)
             if event.text == 'Новый вопрос':
                 handle_question_request(event, vk_api, db)
             elif event.text == 'Сдаться':

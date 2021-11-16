@@ -15,4 +15,4 @@ def check_strings_similarity(string_1, string_2, min_accuracy=90):
 
     accuracy = fuzz.token_set_ratio(string_1, string_2)
 
-    return True if accuracy >= min_accuracy else False
+    return accuracy >= min_accuracy
